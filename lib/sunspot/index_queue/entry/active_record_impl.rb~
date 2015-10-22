@@ -206,15 +206,15 @@ module Sunspot
         end
 
         def too_many_attempts?
-          attempts > ActiveRecordImpl.max_attempts
+          attempts > max_attempts
         end
 
         def deadly_error?
-          ActiveRecordImpl.deadly_errors.any? { |e| error.to_s.include? e }
+          deadly_errors.any? { |e| error.to_s.include? e }
         end
 
         def deletable?
-          ! ActiveRecordImpl.undeletable_classes.include?(record_class_name)
+          ! undeletable_classes.include?(record_class_name)
         end
 
         cattr_accessor :max_attempts
