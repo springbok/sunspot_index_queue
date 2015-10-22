@@ -25,7 +25,7 @@ module Sunspot
       end
       
       # Does nothing in this implementation.
-      def commit
+      def commit(soft_commit = false)
         # no op
       end
       
