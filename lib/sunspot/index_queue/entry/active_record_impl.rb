@@ -65,7 +65,7 @@ module Sunspot
           # Implementation of the total_count method.
           def total_count(queue)
             conditions = queue.class_names.empty? ? {} : {:record_class_name => queue.class_names}
-            count(:conditions => conditions)
+            where(conditions).count(:all)
           end
           
           # Implementation of the ready_count method.
@@ -75,7 +75,7 @@ module Sunspot
               conditions.first << " AND #{connection.quote_column_name('record_class_name')} IN (?)"
               conditions << queue.class_names
             end
-            count(:conditions => conditions)
+            where(conditions).count(:all)
           end
 
           def basic_conditions
@@ -89,7 +89,7 @@ module Sunspot
               conditions.first << " AND #{connection.quote_column_name('record_class_name')} IN (?)"
               conditions << queue.class_names
             end
-            count(:conditions => conditions)
+            where(conditions).count(:all)
           end
 
           # Implementation of the errors method.
@@ -99,13 +99,13 @@ module Sunspot
               conditions.first << " AND #{connection.quote_column_name('record_class_name')} IN (?)"
               conditions << queue.class_names
             end
-            all(:conditions => conditions, :limit => limit, :offset => offset, :order => :id)
+            where(conditions).limit(limit).offset(offset).order(:id).to_a
           end
 
           # Implementation of the reset! method.
           def reset! (queue)
             conditions = queue.class_names.empty? ? {} : {:record_class_name => queue.class_names}
-            update_all({:run_at => Time.now.utc, :attempts => 0, :error => nil, :lock => 0}, conditions)
+            where(conditions).update_all(:run_at => Time.now.utc, :attempts => 0, :error => nil, :lock => nil)
           end
          
           # Implementation of the next_batch! method. 
@@ -115,12 +115,12 @@ module Sunspot
               conditions.first << " AND #{connection.quote_column_name('record_class_name')} IN (?)"
               conditions << queue.class_names
             end
-            batch_entries = all(:select => "id", :conditions => conditions, :limit => queue.batch_size, :order => 'queue_position')
+            batch_entries = select(:id).where(conditions).limit(queue.batch_size).order('priority DESC, run_at')
             queue_entry_ids = batch_entries.collect{|entry| entry.id}
             return [] if queue_entry_ids.empty?
             lock = rand(0x7FFFFFFF)
-            update_all({:run_at => queue.retry_interval.from_now.utc, :lock => lock, :error => nil}, :id => queue_entry_ids)
-            all(:conditions => {:id => queue_entry_ids, :lock => lock})
+            where(:id => queue_entry_ids).update_all(:run_at => queue.retry_interval.from_now.utc, :lock => lock, :error => nil)
+            where(:id => queue_entry_ids, :lock => lock).to_a
           end
           # Alternative implementation (indexes would have to be changed).
           # It performs two queries instead of three and may prevent workers
@@ -144,7 +144,7 @@ module Sunspot
           # Implementation of the add method.
           def add(klass, id, delete, priority)
             queue_entry_key = {:record_id => id, :record_class_name => klass.name, :lock => 0}
-            queue_entry = first(:conditions => queue_entry_key) || new(queue_entry_key.merge(:priority => priority))
+            queue_entry = where(queue_entry_key).first || new(queue_entry_key.merge(:priority => priority))
             queue_entry.is_delete = delete
             queue_entry.priority = priority if priority > queue_entry.priority
             queue_entry.run_at = Time.now.utc
