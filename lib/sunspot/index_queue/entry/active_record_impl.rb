@@ -79,7 +79,7 @@ module Sunspot
           end
 
           def basic_conditions
-            ["#{connection.quote_column_name('run_at')} <= ? AND #{connection.quote_column_name('lock')} = 0", Time.now.utc]
+            ["#{connection.quote_column_name('run_at')} <= ? AND (#{connection.quote_column_name('lock')} = 0 OR #{connection.quote_column_name('lock')} IS NULL)", Time.now.utc]
           end
 
           # Implementation of the error_count method.
@@ -119,7 +119,7 @@ module Sunspot
             queue_entry_ids = batch_entries.collect{|entry| entry.id}
             return [] if queue_entry_ids.empty?
             lock = rand(0x7FFFFFFF)
-            where(:id => queue_entry_ids).update_all(:run_at => queue.retry_interval.from_now.utc, :lock => lock, :error => nil)
+            where(:id => queue_entry_ids).update_all(:run_at => queue.retry_interval.seconds.from_now.utc, :lock => lock, :error => nil)
             where(:id => queue_entry_ids, :lock => lock).to_a
           end
           # Alternative implementation (indexes would have to be changed).
@@ -179,7 +179,7 @@ module Sunspot
         # Implementation of the set_error! method.
         def set_error!(error, retry_interval = nil)
           self.attempts += 1
-          self.run_at = (retry_interval * attempts).from_now.utc if retry_interval
+          self.run_at = (retry_interval * attempts).seconds.from_now.utc if retry_interval
           self.error = "#{error.class.name}: #{error.message}\n#{error.backtrace.join("\n")[0, 4000]}"
           self.priority -= 1
           self.lock = 0
