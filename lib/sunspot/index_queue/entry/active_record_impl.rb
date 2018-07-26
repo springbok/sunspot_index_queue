@@ -119,7 +119,7 @@ module Sunspot
             queue_entry_ids = batch_entries.collect{|entry| entry.id}
             return [] if queue_entry_ids.empty?
             lock = rand(0x7FFFFFFF)
-            where(:id => queue_entry_ids).update_all(:run_at => queue.retry_interval.seconds.from_now.utc, :lock => lock, :error => nil)
+            where(basic_conditions).where(:id => queue_entry_ids).update_all(:run_at => queue.retry_interval.seconds.from_now.utc, :lock => lock, :error => nil)
             where(:id => queue_entry_ids, :lock => lock).to_a
           end
           # Alternative implementation (indexes would have to be changed).
@@ -145,10 +145,12 @@ module Sunspot
           def add(klass, id, delete, priority)
             queue_entry_key = {:record_id => id, :record_class_name => klass.name, :lock => 0}
             queue_entry = where(queue_entry_key).first || new(queue_entry_key.merge(:priority => priority))
-            queue_entry.is_delete = delete
-            queue_entry.priority = priority if priority > queue_entry.priority
-            queue_entry.run_at = Time.now.utc
-            queue_entry.save!
+            if (queue_entry.lock.to_i == 0)
+              queue_entry.is_delete = delete
+              queue_entry.priority = priority if priority > queue_entry.priority
+              queue_entry.run_at = Time.now.utc
+              queue_entry.save!
+            end
           rescue ActiveRecord::RecordNotUnique => e
             false
           end
