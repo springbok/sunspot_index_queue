@@ -79,7 +79,7 @@ module Sunspot
           end
 
           def basic_conditions
-            ["#{connection.quote_column_name('run_at')} <= ? AND (#{connection.quote_column_name('lock')} = 0 OR #{connection.quote_column_name('lock')} IS NULL)", Time.now.utc]
+            ["#{connection.quote_column_name('run_at')} <= ? AND (#{connection.quote_column_name('lock')} = 0 OR #{connection.quote_column_name('lock')} IS NULL)", (Time.now-1.minute).utc]
           end
 
           # Implementation of the error_count method.
